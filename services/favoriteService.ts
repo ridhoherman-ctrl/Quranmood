@@ -1,4 +1,4 @@
-import { FavoriteItem, QuranContent, HadithContent } from '../types';
+import { FavoriteItem } from '../types';
 
 const FAV_STORAGE_KEY = 'qalbu_favorites';
 

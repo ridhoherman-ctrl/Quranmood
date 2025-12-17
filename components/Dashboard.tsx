@@ -255,11 +255,6 @@ const Dashboard: React.FC<DashboardProps> = ({ isOpen, onClose }) => {
                       <div className="relative border-l-2 border-slate-200 dark:border-slate-700 ml-4 space-y-6 pb-2">
                         {history.map((log, index) => {
                           const config = getMoodConfig(log.mood);
-                          // For timeline icons, we might need manual dark adjustments if tailwind classes are complex strings
-                          // Extracting just color logic is tricky, so we use generic fallbacks or specific dark handling if needed
-                          // Simpler: use dark classes inside style logic if config has them, else fallback.
-                          const bgClass = config?.color.split(' ')[0] || 'bg-slate-100'; 
-                          // Note: The `config.color` string already contains `dark:...` classes from constants.ts now
                           
                           return (
                             <div 

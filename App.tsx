@@ -5,7 +5,7 @@ import Dashboard from './components/Dashboard';
 import { HealingContent, MoodType } from './types';
 import { generateHealingContent } from './services/geminiService';
 import { saveMoodLog } from './services/historyService';
-import { getMoodConfig, getRandomLoadingMessage, MOOD_CONFIGS } from './constants';
+import { getMoodConfig, getRandomLoadingMessage } from './constants';
 
 const App: React.FC = () => {
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
