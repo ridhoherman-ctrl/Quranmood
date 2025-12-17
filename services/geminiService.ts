@@ -1,15 +1,13 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { HealingContent, MoodType } from "../types";
 
-// Check for API Key
-const API_KEY = process.env.API_KEY;
-
 export const generateHealingContent = async (mood: MoodType): Promise<HealingContent> => {
-  if (!API_KEY) {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
     throw new Error("API Key is missing. Please check your environment configuration.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   // Timestamp injection to ensure uniqueness and prevent caching similarity
   const uniqueSeed = Date.now();
@@ -94,10 +92,11 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
 };
 
 export const generateSpeech = async (text: string): Promise<string> => {
-  if (!API_KEY) {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
     throw new Error("API Key is missing.");
   }
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
 
   try {
     const response = await ai.models.generateContent({
