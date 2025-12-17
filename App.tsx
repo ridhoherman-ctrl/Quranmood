@@ -2,12 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import MoodSelector from './components/MoodSelector';
 import ContentDisplay from './components/ContentDisplay';
 import Dashboard from './components/Dashboard';
+import Cover from './components/Cover';
 import { HealingContent, MoodType } from './types';
 import { generateHealingContent } from './services/geminiService';
 import { saveMoodLog } from './services/historyService';
 import { getMoodConfig, getRandomLoadingMessage } from './constants';
 
 const App: React.FC = () => {
+  // Navigation State
+  const [showCover, setShowCover] = useState<boolean>(true);
+
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
   const [content, setContent] = useState<HealingContent | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -131,6 +135,17 @@ const App: React.FC = () => {
     setCurrentLogId(undefined);
   };
 
+  const handleStartApp = () => {
+    setShowCover(false);
+  };
+
+  // --- RENDER COVER IF STATE IS TRUE ---
+  if (showCover) {
+    return <Cover onStart={handleStartApp} />;
+  }
+
+  // --- MAIN APP RENDER ---
+
   // Helper to render loading UI
   const renderLoading = () => {
     // Fallback if config is null (shouldn't happen if selectedMood is set)
@@ -170,7 +185,7 @@ const App: React.FC = () => {
       {/* Gradient Overlay for better text readability at bottom */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/60 dark:to-slate-900/60 pointer-events-none"></div>
 
-      <main className="relative z-10 max-w-5xl mx-auto px-4 py-10 md:py-16 min-h-screen flex flex-col items-center">
+      <main className="relative z-10 max-w-5xl mx-auto px-4 py-10 md:py-16 min-h-screen flex flex-col items-center animate-[fadeIn_1s_ease-out]">
         
         {/* Header */}
         <header className="text-center mb-12 space-y-4 w-full relative">
