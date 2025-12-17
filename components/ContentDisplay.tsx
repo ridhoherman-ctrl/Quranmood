@@ -232,9 +232,9 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({ data, onReset, onRefres
       {/* --- SECTION 2: HIKMAH & PRAKTIK (SOLUSI) --- */}
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Wisdom Card - Updated to Mood Nude Color with Animated Gradient */}
+        {/* Wisdom Card - Updated: Removed conflicting bg-gradient to ensure visibility */}
         <div 
-          className={`opacity-0 animate-fadeInUp rounded-3xl p-8 shadow-lg border ${theme.border} ${theme.ui.pill} ${theme.background} bg-[length:300%_300%] animate-gradient-shift`}
+          className={`opacity-0 animate-fadeInUp rounded-3xl p-8 shadow-lg border ${theme.border} ${theme.ui.pill}`}
           style={{ animationDelay: '0.4s' }}
         >
           <div className="flex items-center gap-3 mb-4">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MoodSelector from './components/MoodSelector';
 import ContentDisplay from './components/ContentDisplay';
 import Dashboard from './components/Dashboard';
@@ -16,6 +16,9 @@ const App: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>("");
   const [currentLogId, setCurrentLogId] = useState<string | undefined>(undefined);
   
+  // Ref for clearing interval
+  const loadingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Theme State
   const [darkMode, setDarkMode] = useState<boolean>(false);
 
@@ -42,6 +45,29 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Effect to cycle loading messages
+  useEffect(() => {
+    if (loading && selectedMood) {
+      // Set initial message
+      setLoadingMessage(getRandomLoadingMessage(selectedMood));
+      
+      // Rotate message every 2.5 seconds to make waiting feel shorter
+      loadingIntervalRef.current = setInterval(() => {
+        setLoadingMessage(getRandomLoadingMessage(selectedMood));
+      }, 2500);
+    } else {
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
+    }
+
+    return () => {
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
+    };
+  }, [loading, selectedMood]);
+
   const toggleTheme = () => {
     const newMode = !darkMode;
     setDarkMode(newMode);
@@ -67,7 +93,7 @@ const App: React.FC = () => {
   // Separated fetching logic to reuse for refresh
   const fetchContent = async (mood: MoodType) => {
     setLoading(true);
-    setLoadingMessage(getRandomLoadingMessage(mood)); 
+    // Message logic is now handled by useEffect
     setError(null);
     setContent(null);
 
@@ -123,12 +149,15 @@ const App: React.FC = () => {
            </div>
         </div>
         
-        <h3 className={`text-xl font-serif font-medium mb-2 animate-pulse ${textClass}`}>
-          {loadingMessage}
-        </h3>
-        <p className={`text-sm ${secondaryTextClass}`}>
-          Mohon tunggu, sedang memilihkan ayat terbaik...
-        </p>
+        {/* Animated Text Container */}
+        <div className="h-20 flex flex-col items-center">
+            <h3 key={loadingMessage} className={`text-xl font-serif font-medium mb-2 animate-[fadeInUp_0.3s_ease-out] text-center ${textClass}`}>
+            {loadingMessage}
+            </h3>
+            <p className={`text-sm ${secondaryTextClass}`}>
+            Mohon tunggu, sedang memilihkan ayat terbaik...
+            </p>
+        </div>
       </div>
     );
   };

@@ -9,24 +9,28 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
 
   const ai = new GoogleGenAI({ apiKey });
 
-  // Timestamp injection to ensure uniqueness and prevent caching similarity
+  // Timestamp injection to ensure uniqueness
   const uniqueSeed = Date.now();
 
-  const prompt = `
-    Seorang pengguna sedang merasa "${mood}". 
-    Bertindaklah sebagai teman yang bijaksana, psikolog Islami, dan ustadz yang menenangkan.
-    
-    TUGAS PENTING:
-    1. Pilihkan satu ayat Al-Quran (lengkap harakat & arti) yang relevan. 
-       CATATAN: Lakukan pemilihan secara ACAK/RANDOM dari berbagai surat yang mungkin relevan. JANGAN memberikan ayat yang sama terus menerus untuk mood ini. Variasikan pilihannya.
-    2. Pilihkan satu Hadist (sumber & isi) yang relevan sebagai penguat. Variasikan juga hadistnya.
-    3. "wisdom": Sebuah paragraf hikmah mendalam yang menghubungkan perasaan user dengan ayat/hadist tersebut.
-    4. "practicalSteps": Berikan 3 poin tindakan nyata.
-    5. "reflectionQuestions": Berikan 2 pertanyaan renungan.
-    
-    Random Seed: ${uniqueSeed} (Gunakan ini untuk memastikan hasil yang berbeda dari request sebelumnya)
+  // Optimized System Instruction: Define persona and general rules here
+  const systemInstruction = `
+    Anda adalah sahabat bijaksana, psikolog Islami, dan ustadz yang menenangkan.
+    Gaya bicara: Hangat, empatik, menyentuh hati, namun ringkas dan padat (to-the-point).
+    Jangan bertele-tele. Fokus pada kualitas penyembuhan hati.
+  `;
 
-    Pastikan bahasa Indonesia yang digunakan hangat, menyentuh hati, dan empatik.
+  // Optimized Prompt: Focus on specific data requirements only
+  const prompt = `
+    Konteks: Pengguna sedang merasa "${mood}".
+    
+    TUGAS:
+    1. Pilih 1 Ayat Al-Quran (Random/Acak) yang relevan.
+    2. Pilih 1 Hadist pendukung.
+    3. Wisdom: Hikmah singkat (maksimal 2 kalimat) yang mengena.
+    4. Practical Steps: 3 langkah aksi nyata yang singkat.
+    5. Reflection Questions: 2 pertanyaan renungan pendek.
+    
+    Seed: ${uniqueSeed}
   `;
 
   try {
@@ -34,12 +38,13 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
       model: "gemini-2.5-flash",
       contents: prompt,
       config: {
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             mood: { type: Type.STRING },
-            summary: { type: Type.STRING, description: "Kalimat pembuka yang hangat." },
+            summary: { type: Type.STRING, description: "Sapaan pembuka sangat singkat (1 kalimat)." },
             quran: {
               type: Type.OBJECT,
               properties: {
@@ -48,7 +53,7 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
                 ayahNumber: { type: Type.INTEGER },
                 arabicText: { type: Type.STRING },
                 translation: { type: Type.STRING },
-                reflection: { type: Type.STRING },
+                reflection: { type: Type.STRING, description: "Konteks ayat (maks 15 kata)." },
               },
               required: ["surahName", "surahNumber", "ayahNumber", "arabicText", "translation", "reflection"]
             },
@@ -57,20 +62,20 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
               properties: {
                 source: { type: Type.STRING },
                 text: { type: Type.STRING },
-                reflection: { type: Type.STRING },
+                reflection: { type: Type.STRING, description: "Konteks hadist (maks 15 kata)." },
               },
               required: ["source", "text", "reflection"]
             },
-            wisdom: { type: Type.STRING, description: "Hikmah mendalam tentang perasaan ini dalam pandangan Islam" },
+            wisdom: { type: Type.STRING, description: "Hikmah mendalam (maks 25 kata)." },
             practicalSteps: { 
               type: Type.ARRAY, 
               items: { type: Type.STRING },
-              description: "3 langkah praktis/amalan"
+              description: "3 langkah praktis singkat"
             },
             reflectionQuestions: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "2 pertanyaan renungan"
+              description: "2 pertanyaan renungan singkat"
             }
           },
           required: ["mood", "summary", "quran", "hadith", "wisdom", "practicalSteps", "reflectionQuestions"]
