@@ -2,12 +2,8 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { HealingContent, MoodType } from "../types";
 
 export const generateHealingContent = async (mood: MoodType): Promise<HealingContent> => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key is missing. Please check your environment configuration.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Use process.env.API_KEY directly and use gemini-3-pro-preview for complex reasoning tasks
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
   // Timestamp injection to ensure uniqueness
   const uniqueSeed = Date.now();
@@ -35,8 +31,8 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
+      model: "gemini-3-pro-preview",
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: systemInstruction,
         responseMimeType: "application/json",
@@ -88,7 +84,7 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
       throw new Error("No response from Gemini");
     }
 
-    return JSON.parse(text) as HealingContent;
+    return JSON.parse(text.trim()) as HealingContent;
 
   } catch (error) {
     console.error("Error generating content:", error);
@@ -97,16 +93,13 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
 };
 
 export const generateSpeech = async (text: string): Promise<string> => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key is missing.");
-  }
-  const ai = new GoogleGenAI({ apiKey });
+  // Use process.env.API_KEY directly and ensure model name is correct for TTS
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: { parts: [{ text }] },
+      contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {

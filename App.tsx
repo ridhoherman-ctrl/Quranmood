@@ -1,16 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from './services/firebaseService';
+
 import MoodSelector from './components/MoodSelector';
 import ContentDisplay from './components/ContentDisplay';
 import Dashboard from './components/Dashboard';
 import Cover from './components/Cover';
+import Login from './components/Login';
+import WaitingRoom from './components/WaitingRoom';
+
 import { HealingContent, MoodType } from './types';
 import { generateHealingContent } from './services/geminiService';
 import { saveMoodLog } from './services/historyService';
 import { getMoodConfig, getRandomLoadingMessage } from './constants';
 
 const App: React.FC = () => {
-  // Navigation State
+  // Auth & Approval State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // App Navigation State
   const [showCover, setShowCover] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
   const [content, setContent] = useState<HealingContent | null>(null);
@@ -20,42 +33,44 @@ const App: React.FC = () => {
   const [loadingMessage, setLoadingMessage] = useState<string>("");
   const [currentLogId, setCurrentLogId] = useState<string | undefined>(undefined);
   
-  // Ref for clearing interval
-  const loadingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const loadingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Theme State
-  const [darkMode, setDarkMode] = useState<boolean>(false);
-
-  // Initialize Theme on Mount
+  // Monitor Auth State
   useEffect(() => {
-    // Check localStorage first
-    const savedTheme = localStorage.getItem('theme');
-    
-    if (savedTheme === 'dark') {
-      setDarkMode(true);
-      document.documentElement.classList.add('dark');
-    } else if (savedTheme === 'light') {
-      setDarkMode(false);
-      document.documentElement.classList.remove('dark');
-    } else {
-      // If no local storage, check system preference
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        setDarkMode(true);
-        document.documentElement.classList.add('dark');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      if (user) {
+        // Listen to user status in Firestore
+        const userDocRef = doc(db, "users", user.uid);
+        const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setIsApproved(docSnap.data().status === 'approved');
+          } else {
+            // Document hasn't been created yet (shouldn't happen with standard flow)
+            setIsApproved(false);
+          }
+          setAuthLoading(false);
+        });
+        return () => unsubDoc();
       } else {
-        setDarkMode(false);
-        document.documentElement.classList.remove('dark');
+        setIsApproved(null);
+        setAuthLoading(false);
       }
-    }
+    });
+    return () => unsubscribe();
   }, []);
 
-  // Effect to cycle loading messages
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
   useEffect(() => {
     if (loading && selectedMood) {
-      // Set initial message
       setLoadingMessage(getRandomLoadingMessage(selectedMood));
-      
-      // Rotate message every 2.5 seconds to make waiting feel shorter
       loadingIntervalRef.current = setInterval(() => {
         setLoadingMessage(getRandomLoadingMessage(selectedMood));
       }, 2500);
@@ -64,7 +79,6 @@ const App: React.FC = () => {
         clearInterval(loadingIntervalRef.current);
       }
     }
-
     return () => {
       if (loadingIntervalRef.current) {
         clearInterval(loadingIntervalRef.current);
@@ -72,32 +86,18 @@ const App: React.FC = () => {
     };
   }, [loading, selectedMood]);
 
-  const toggleTheme = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    
-    if (newMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  };
-
-  // Get current config for theming
-  const currentConfig = selectedMood ? getMoodConfig(selectedMood) : null;
+  const currentConfig = selectedMood ? getMoodConfig(selectedMood, isDarkMode) : null;
   
-  // Default theme properties if no mood selected
-  const themeClass = currentConfig ? currentConfig.theme.background : 'bg-gradient-to-br from-emerald-50 via-teal-50 to-slate-50 dark:from-slate-900 dark:via-emerald-950 dark:to-teal-950';
-  const textClass = currentConfig ? currentConfig.theme.primaryText : 'text-emerald-950 dark:text-emerald-50';
-  const secondaryTextClass = currentConfig ? currentConfig.theme.secondaryText : 'text-slate-600 dark:text-slate-400';
-  const accentButtonClass = currentConfig ? currentConfig.theme.ui.buttonSecondary : 'bg-white/80 text-emerald-800 border-emerald-100 hover:bg-emerald-50 dark:bg-slate-800 dark:text-emerald-200 dark:border-emerald-800 dark:hover:bg-emerald-900';
+  const themeClass = isDarkMode 
+    ? 'bg-midnight-950 text-slate-100' 
+    : 'bg-[#FDFCF0] text-midnight-950';
 
-  // Separated fetching logic to reuse for refresh
+  const accentButtonClass = isDarkMode
+    ? 'bg-midnight-900/80 text-gold-400 border-gold-600/30 hover:bg-midnight-800 hover:text-gold-300'
+    : 'bg-white/80 text-gold-700 border-gold-500/20 hover:bg-gold-50 hover:text-gold-800 shadow-md';
+
   const fetchContent = async (mood: MoodType) => {
     setLoading(true);
-    // Message logic is now handled by useEffect
     setError(null);
     setContent(null);
 
@@ -105,8 +105,7 @@ const App: React.FC = () => {
       const data = await generateHealingContent(mood);
       setContent(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan yang tidak terduga.");
-      // Only reset selection on error if we don't have content yet (initial load)
+      setError(err instanceof Error ? err.message : "Terjadi kendala spiritual. Silakan coba lagi.");
       if (!content) setSelectedMood(null);
     } finally {
       setLoading(false);
@@ -115,10 +114,8 @@ const App: React.FC = () => {
 
   const handleMoodSelect = async (mood: MoodType) => {
     setSelectedMood(mood);
-    // Save mood to history immediately and capture the ID
     const log = saveMoodLog(mood);
     setCurrentLogId(log.id);
-    
     await fetchContent(mood);
   };
 
@@ -139,38 +136,54 @@ const App: React.FC = () => {
     setShowCover(false);
   };
 
-  // --- RENDER COVER IF STATE IS TRUE ---
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
+  const handleLogout = () => {
+    auth.signOut();
+  };
+
+  // Loading global state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-midnight-950 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-gold-600/20 border-t-gold-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Not logged in
+  if (!currentUser) {
+    return <Login />;
+  }
+
+  // Logged in but not approved by admin
+  if (isApproved === false) {
+    return <WaitingRoom />;
+  }
+
+  // Welcome Screen (Cover)
   if (showCover) {
     return <Cover onStart={handleStartApp} />;
   }
 
-  // --- MAIN APP RENDER ---
-
-  // Helper to render loading UI
   const renderLoading = () => {
-    // Fallback if config is null (shouldn't happen if selectedMood is set)
-    const colorClass = currentConfig?.color.split(' ')[0] || 'bg-emerald-200';
-    
     return (
       <div className="flex flex-col items-center justify-center py-20 animate-[fadeIn_0.5s_ease-out]">
-        <div className="relative w-24 h-24 mb-8">
-           {/* Outer Breathing Circle */}
-           <div className={`absolute inset-0 rounded-full opacity-20 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] ${colorClass}`}></div>
-           <div className={`absolute inset-2 rounded-full opacity-40 animate-[pulse_2s_ease-in-out_infinite] ${colorClass}`}></div>
-           
-           {/* Inner Icon Container */}
-           <div className={`absolute inset-0 flex items-center justify-center bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 z-10`}>
-              <span className="text-4xl animate-[bounce_3s_infinite]">{currentConfig?.icon || '🤲'}</span>
+        <div className="relative w-32 h-32 mb-10">
+           <div className={`absolute inset-0 rounded-full opacity-10 animate-[ping_3s_infinite] bg-gold-500`}></div>
+           <div className={`absolute inset-2 rounded-full opacity-30 animate-[pulse_2s_infinite] bg-gold-600`}></div>
+           <div className={`absolute inset-0 flex items-center justify-center rounded-full shadow-xl border border-gold-600/30 z-10 ${isDarkMode ? 'bg-midnight-900' : 'bg-white'}`}>
+              <span className="text-5xl animate-[bounce_3s_infinite]">{currentConfig?.icon || '🌙'}</span>
            </div>
         </div>
-        
-        {/* Animated Text Container */}
-        <div className="h-20 flex flex-col items-center">
-            <h3 key={loadingMessage} className={`text-xl font-serif font-medium mb-2 animate-[fadeInUp_0.3s_ease-out] text-center ${textClass}`}>
+        <div className="h-24 flex flex-col items-center">
+            <h3 key={loadingMessage} className={`text-2xl font-serif font-medium mb-3 animate-[fadeInUp_0.3s_ease-out] text-center ${isDarkMode ? 'text-gold-200' : 'text-gold-700'}`}>
             {loadingMessage}
             </h3>
-            <p className={`text-sm ${secondaryTextClass}`}>
-            Mohon tunggu, sedang memilihkan ayat terbaik...
+            <p className={`text-sm uppercase tracking-widest font-bold ${isDarkMode ? 'text-gold-600' : 'text-gold-500'}`}>
+            Mencari Ketenangan...
             </p>
         </div>
       </div>
@@ -178,82 +191,73 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-fixed relative transition-colors duration-1000 ease-in-out ${themeClass}`}>
-      {/* Pattern Overlay */}
-      <div className="absolute inset-0 opacity-40 dark:opacity-20 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')] dark:invert"></div>
+    <div className={`min-h-screen bg-fixed relative overflow-x-hidden transition-colors duration-700 ${themeClass}`}>
+      <div className={`absolute inset-0 opacity-[0.05] pointer-events-none islamic-bg ${isDarkMode ? 'invert' : ''}`}></div>
       
-      {/* Gradient Overlay for better text readability at bottom */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/60 dark:to-slate-900/60 pointer-events-none"></div>
-
-      <main className="relative z-10 max-w-5xl mx-auto px-4 py-10 md:py-16 min-h-screen flex flex-col items-center animate-[fadeIn_1s_ease-out]">
+      <main className="relative z-10 max-w-5xl mx-auto px-4 py-8 md:py-16 min-h-screen flex flex-col items-center animate-[fadeIn_1s_ease-out]">
         
-        {/* Header */}
-        <header className="text-center mb-12 space-y-4 w-full relative">
-          {/* Top Controls */}
-          <div className="absolute top-0 right-0 md:right-4 flex gap-2">
-            {/* Theme Toggle */}
+        {/* Header Controls */}
+        <div className="w-full flex justify-between items-center mb-10">
+          <div className="flex gap-2">
             <button 
-               onClick={toggleTheme}
-               className={`p-2 backdrop-blur-sm border rounded-full transition-all shadow-sm ${accentButtonClass}`}
-               title={darkMode ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
+              onClick={toggleTheme}
+              className={`p-3 rounded-full transition-all duration-300 ${accentButtonClass}`}
+              title={isDarkMode ? "Ganti ke Mode Siang" : "Ganti ke Mode Malam"}
             >
-              {darkMode ? (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-yellow-300">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+              {isDarkMode ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-gold-400">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M3 12h2.25m.386-6.364l1.591 1.591M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-gold-700">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
                 </svg>
               )}
             </button>
-            
-            {/* Dashboard Button */}
             <button 
-              onClick={() => setShowDashboard(true)}
-              className={`flex items-center gap-2 px-4 py-2 backdrop-blur-sm border rounded-full text-sm font-medium transition-all shadow-sm group ${accentButtonClass}`}
+              onClick={handleLogout}
+              className={`p-3 rounded-full transition-all duration-300 ${accentButtonClass}`}
+              title="Keluar"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 group-hover:scale-110 transition-transform">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
               </svg>
-              Jurnal Mood
             </button>
           </div>
 
-          <div className={`inline-flex items-center justify-center p-3 rounded-full mb-4 shadow-sm bg-white/50 dark:bg-slate-800/50 backdrop-blur-md`}>
-             <span className="text-3xl">🕌</span>
+          <button 
+            onClick={() => setShowDashboard(true)}
+            className={`flex items-center gap-2 px-6 py-2.5 backdrop-blur-md border rounded-full text-sm font-bold transition-all group ${accentButtonClass}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-5 h-5 group-hover:scale-110 transition-transform ${isDarkMode ? 'text-gold-500' : 'text-gold-600'}`}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+            </svg>
+            Jurnal Spiritual
+          </button>
+        </div>
+
+        {/* Header Title */}
+        <header className="text-center mb-16 space-y-4 w-full relative">
+          <div className={`inline-flex items-center justify-center p-4 rounded-full mb-2 backdrop-blur-md border shadow-xl ${isDarkMode ? 'bg-midnight-900/50 border-gold-600/20' : 'bg-white/80 border-gold-500/20'}`}>
+             <span className="text-4xl filter drop-shadow-md">✨</span>
           </div>
-          <h1 className={`text-4xl md:text-5xl font-bold font-serif tracking-tight transition-colors duration-700 ${textClass}`}>
-            Qur'an Mood
+          <h1 className={`text-5xl md:text-7xl font-bold font-serif tracking-tight ${isDarkMode ? 'text-gold-100' : 'text-midnight-950'}`}>
+            Qur'an <span className={isDarkMode ? 'text-gold-500' : 'text-gold-600'}>Mood</span>
           </h1>
-          <p className={`text-lg max-w-md mx-auto transition-colors duration-700 ${secondaryTextClass}`}>
-            Temukan ketenangan melalui Al-Quran dan Hadist yang menyapa suasana hatimu saat ini.
-          </p>
+          <div className="flex flex-col gap-2 items-center">
+            <p className={`text-xl md:text-2xl font-light max-w-2xl mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              Refleksi Spesial Ramadhan 1447H • 2026
+            </p>
+            <div className={`h-0.5 w-20 rounded-full ${isDarkMode ? 'bg-gold-600/40' : 'bg-gold-500/30'}`}></div>
+          </div>
         </header>
 
-        {/* Loading State */}
         {loading && renderLoading()}
 
-        {/* Error State */}
-        {error && !loading && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center max-w-md animate-bounce-in">
-            <div className="text-red-500 text-4xl mb-3">⚠️</div>
-            <h3 className="text-red-800 dark:text-red-200 font-bold mb-2">Terjadi Kesalahan</h3>
-            <p className="text-red-600 dark:text-red-300 mb-4">{error}</p>
-            <button 
-              onClick={() => setError(null)}
-              className="px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition"
-            >
-              Coba Lagi
-            </button>
-          </div>
-        )}
-
-        {/* Initial View: Mood Selection */}
         {!content && !loading && !error && (
           <div className="w-full flex flex-col items-center animate-[fadeIn_0.5s_ease-out]">
-            <h2 className={`text-xl font-medium mb-8 ${secondaryTextClass}`}>
-              Apa yang sedang kamu rasakan?
+            <h2 className={`text-2xl font-light mb-12 italic ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+              "Apa yang sedang dirasakan jiwamu hari ini?"
             </h2>
             <MoodSelector 
               onSelect={handleMoodSelect} 
@@ -263,7 +267,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* Result View: Content Display */}
         {content && !loading && currentConfig && (
           <ContentDisplay 
             data={content} 
@@ -274,14 +277,13 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* Footer */}
-        <footer className={`mt-auto pt-16 text-center text-sm ${secondaryTextClass} opacity-70`}>
-          <p>&copy; {new Date().getFullYear()} Qur'an Mood. Dibuat dengan niat baik.</p>
+        <footer className={`mt-auto pt-20 text-center font-medium ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>
+          <p className={`mb-2 font-serif text-lg tracking-widest ${isDarkMode ? 'text-gold-600/40' : 'text-gold-500/40'}`}>Ramadhan 1447H Edition</p>
+          <p>&copy; 2026 Qur'an Mood. Sampaikanlah walau satu ayat.</p>
         </footer>
 
       </main>
 
-      {/* Dashboard Modal */}
       <Dashboard isOpen={showDashboard} onClose={() => setShowDashboard(false)} />
     </div>
   );
