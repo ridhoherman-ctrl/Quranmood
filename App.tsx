@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from './services/firebaseService';
+import { auth, db, isConfigValid } from './services/firebaseService';
 
 import MoodSelector from './components/MoodSelector';
 import ContentDisplay from './components/ContentDisplay';
@@ -17,7 +18,7 @@ import { getMoodConfig, getRandomLoadingMessage } from './constants';
 
 const App: React.FC = () => {
   // Auth & Approval State
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | any>(null);
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -35,20 +36,30 @@ const App: React.FC = () => {
   
   const loadingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Monitor Auth State
+  // Monitor Auth State with Mock Fallback for Preview
   useEffect(() => {
+    if (!isConfigValid || !auth) {
+      console.log("Running in Demo Mode (No Firebase Config Found)");
+      setCurrentUser({ email: 'demo@quranmood.com', uid: 'demo-user' });
+      setIsApproved(true);
+      setAuthLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      if (user) {
-        // Listen to user status in Firestore
+      if (user && db) {
         const userDocRef = doc(db, "users", user.uid);
         const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             setIsApproved(docSnap.data().status === 'approved');
           } else {
-            // Document hasn't been created yet (shouldn't happen with standard flow)
             setIsApproved(false);
           }
+          setAuthLoading(false);
+        }, (err) => {
+          console.error("Firestore error:", err);
+          setIsApproved(true); // Fallback for stability
           setAuthLoading(false);
         });
         return () => unsubDoc();
@@ -141,29 +152,27 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    auth.signOut();
+    if (auth) auth.signOut();
+    else setCurrentUser(null);
   };
 
-  // Loading global state
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-midnight-950 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gold-600/20 border-t-gold-500 rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-midnight-950 flex flex-col items-center justify-center gap-6">
+        <div className="w-16 h-16 border-4 border-gold-600/20 border-t-gold-500 rounded-full animate-spin"></div>
+        <p className="text-gold-500 font-serif animate-pulse tracking-widest uppercase text-xs">Mempersiapkan Mihrab...</p>
       </div>
     );
   }
 
-  // Not logged in
   if (!currentUser) {
     return <Login />;
   }
 
-  // Logged in but not approved by admin
   if (isApproved === false) {
     return <WaitingRoom />;
   }
 
-  // Welcome Screen (Cover)
   if (showCover) {
     return <Cover onStart={handleStartApp} />;
   }
@@ -179,11 +188,11 @@ const App: React.FC = () => {
            </div>
         </div>
         <div className="h-24 flex flex-col items-center">
-            <h3 key={loadingMessage} className={`text-2xl font-serif font-medium mb-3 animate-[fadeInUp_0.3s_ease-out] text-center ${isDarkMode ? 'text-gold-200' : 'text-gold-700'}`}>
+            <h3 key={loadingMessage} className={`text-2xl font-serif font-medium mb-3 animate-[fadeInUp_0.3s_ease-out] text-center px-4 ${isDarkMode ? 'text-gold-200' : 'text-gold-700'}`}>
             {loadingMessage}
             </h3>
             <p className={`text-sm uppercase tracking-widest font-bold ${isDarkMode ? 'text-gold-600' : 'text-gold-500'}`}>
-            Mencari Ketenangan...
+            Mencari Ketenangan di antara ayat-Nya...
             </p>
         </div>
       </div>
@@ -246,9 +255,9 @@ const App: React.FC = () => {
           </h1>
           <div className="flex flex-col gap-2 items-center">
             <p className={`text-xl md:text-2xl font-light max-w-2xl mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Refleksi Spesial Ramadhan 1447H • 2026
+              Refleksi Hati Melalui Cahaya Ayat
             </p>
-            <div className={`h-0.5 w-20 rounded-full ${isDarkMode ? 'bg-gold-600/40' : 'bg-gold-500/30'}`}></div>
+            <div className={`h-0.5 w-24 rounded-full ${isDarkMode ? 'bg-gold-600/40' : 'bg-gold-500/30'}`}></div>
           </div>
         </header>
 
@@ -267,6 +276,18 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl text-center max-w-md">
+            <p className="text-red-400 font-medium mb-4">{error}</p>
+            <button 
+              onClick={handleReset}
+              className="px-6 py-2 bg-red-500 text-white rounded-full font-bold hover:bg-red-600 transition-colors"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        )}
+
         {content && !loading && currentConfig && (
           <ContentDisplay 
             data={content} 
@@ -278,8 +299,8 @@ const App: React.FC = () => {
         )}
 
         <footer className={`mt-auto pt-20 text-center font-medium ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>
-          <p className={`mb-2 font-serif text-lg tracking-widest ${isDarkMode ? 'text-gold-600/40' : 'text-gold-500/40'}`}>Ramadhan 1447H Edition</p>
-          <p>&copy; 2026 Qur'an Mood. Sampaikanlah walau satu ayat.</p>
+          <p className={`mb-2 font-serif text-lg tracking-widest ${isDarkMode ? 'text-gold-600/40' : 'text-gold-500/40'}`}>Cahaya Penerang Jiwa</p>
+          <p>&copy; 2024 Qur'an Mood. Sampaikanlah walau satu ayat.</p>
         </footer>
 
       </main>

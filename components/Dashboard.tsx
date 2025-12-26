@@ -1,27 +1,43 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { MoodLog, MoodType, FavoriteItem } from '../types';
 import { getMoodHistory, clearMoodHistory } from '../services/historyService';
 import { getFavorites, removeFavorite } from '../services/favoriteService';
-import { getMoodConfig, MOOD_CONFIGS } from '../constants';
+import { getMoodConfig, MOOD_CONFIGS, DAILY_IBADAH } from '../constants';
 
 interface DashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type TabType = 'history' | 'favorites';
+type TabType = 'history' | 'favorites' | 'checklist';
 
 const Dashboard: React.FC<DashboardProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<TabType>('history');
   const [history, setHistory] = useState<MoodLog[]>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [checkedIbadah, setCheckedIbadah] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       setHistory(getMoodHistory());
       setFavorites(getFavorites());
+      
+      const savedChecklist = localStorage.getItem('qalbu_checklist');
+      if (savedChecklist) {
+        setCheckedIbadah(JSON.parse(savedChecklist));
+      }
     }
   }, [isOpen, activeTab]);
+
+  const toggleIbadah = (id: string) => {
+    const newChecked = checkedIbadah.includes(id)
+      ? checkedIbadah.filter(item => item !== id)
+      : [...checkedIbadah, id];
+    
+    setCheckedIbadah(newChecked);
+    localStorage.setItem('qalbu_checklist', JSON.stringify(newChecked));
+  };
 
   const handleClearHistory = () => {
     if (window.confirm("Hapus semua jejak spiritual Anda?")) {
@@ -87,8 +103,8 @@ const Dashboard: React.FC<DashboardProps> = ({ isOpen, onClose }) => {
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-10">
               <div>
-                <h2 className="text-4xl md:text-5xl font-serif font-bold text-gold-100 mb-2">Jurnal Spiritual Ramadhan</h2>
-                <p className="text-gold-500/80 text-lg font-light tracking-wide uppercase tracking-[0.2em]">1447 Hijriah • 2026 Edition</p>
+                <h2 className="text-4xl md:text-5xl font-serif font-bold text-gold-100 mb-2">Jurnal Ketenangan Hati</h2>
+                <p className="text-gold-500/80 text-lg font-light tracking-wide uppercase tracking-[0.2em]">Pencatatan Perjalanan Ruhiyah</p>
               </div>
               <button onClick={onClose} className="p-3 bg-midnight-800 border border-gold-600/30 hover:bg-midnight-700 rounded-full transition-colors text-gold-500 shadow-xl">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-7 h-7">
@@ -97,26 +113,36 @@ const Dashboard: React.FC<DashboardProps> = ({ isOpen, onClose }) => {
               </button>
             </div>
 
-            <div className="flex gap-6">
+            <div className="flex gap-4 md:gap-6 overflow-x-auto pb-2 scrollbar-hide">
               <button 
                 onClick={() => setActiveTab('history')}
-                className={`px-8 py-3 rounded-full text-sm font-bold transition-all border ${
+                className={`px-8 py-3 rounded-full text-sm font-bold transition-all border shrink-0 ${
                   activeTab === 'history' 
                     ? 'bg-gold-500 text-midnight-950 border-gold-400 shadow-[0_5px_15px_rgba(245,158,11,0.3)]' 
                     : 'bg-midnight-800 text-gold-400 border-gold-600/30 hover:border-gold-500/50'
                 }`}
               >
-                📊 Riwayat Perasaan
+                📊 Riwayat Hati
+              </button>
+              <button 
+                onClick={() => setActiveTab('checklist')}
+                className={`px-8 py-3 rounded-full text-sm font-bold transition-all border shrink-0 ${
+                  activeTab === 'checklist' 
+                    ? 'bg-gold-500 text-midnight-950 border-gold-400 shadow-[0_5px_15px_rgba(245,158,11,0.3)]' 
+                    : 'bg-midnight-800 text-gold-400 border-gold-600/30 hover:border-gold-500/50'
+                }`}
+              >
+                🌙 Amalan Harian
               </button>
               <button 
                 onClick={() => setActiveTab('favorites')}
-                className={`px-8 py-3 rounded-full text-sm font-bold transition-all border ${
+                className={`px-8 py-3 rounded-full text-sm font-bold transition-all border shrink-0 ${
                   activeTab === 'favorites' 
                     ? 'bg-gold-500 text-midnight-950 border-gold-400 shadow-[0_5px_15px_rgba(245,158,11,0.3)]' 
                     : 'bg-midnight-800 text-gold-400 border-gold-600/30 hover:border-gold-500/50'
                 }`}
               >
-                ❤️ Ayat Favorit
+                ❤️ Favorit
               </button>
             </div>
           </div>
@@ -131,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ isOpen, onClose }) => {
                   <div className="flex flex-col items-center justify-center py-24 text-slate-500">
                     <div className="text-8xl mb-6 filter grayscale opacity-30">📖</div>
                     <h3 className="text-2xl font-bold text-gold-600/50 uppercase tracking-[0.2em]">Lembaran Masih Kosong</h3>
-                    <p className="mt-2 text-slate-600 font-medium">Mulailah refleksi pertamamu di bulan Ramadhan ini.</p>
+                    <p className="mt-2 text-slate-600 font-medium">Mulailah refleksi pertamamu hari ini.</p>
                   </div>
                 ) : (
                   <>
@@ -184,7 +210,7 @@ const Dashboard: React.FC<DashboardProps> = ({ isOpen, onClose }) => {
                     <div className="space-y-8">
                       <h3 className="text-3xl font-serif font-bold text-gold-100 mb-10 flex items-center gap-4">
                         <span className="h-10 w-1.5 bg-gradient-to-b from-gold-600 to-transparent rounded-full"></span>
-                        Jejak Hati di Bulan Suci
+                        Jejak Hati Setiap Hari
                       </h3>
                       <div className="relative border-l-2 border-gold-600/20 ml-6 space-y-10 pb-4">
                         {history.map((log, index) => {
@@ -218,13 +244,66 @@ const Dashboard: React.FC<DashboardProps> = ({ isOpen, onClose }) => {
               </>
             )}
 
+            {activeTab === 'checklist' && (
+              <div className="space-y-8 animate-fadeIn max-w-2xl mx-auto">
+                <div className="text-center mb-12">
+                   <h3 className="text-3xl font-serif font-bold text-gold-100">Amalan Harian</h3>
+                   <p className="text-gold-600/70 text-sm mt-2 font-medium">Melacak ketaatan dan menjaga hubungan dengan Sang Pencipta.</p>
+                </div>
+
+                <div className="grid gap-6">
+                   {DAILY_IBADAH.map((item, idx) => {
+                      const isChecked = checkedIbadah.includes(item.id);
+                      return (
+                         <div 
+                           key={item.id}
+                           onClick={() => toggleIbadah(item.id)}
+                           className={`group flex items-center gap-6 p-6 md:p-8 rounded-[2.5rem] border-2 cursor-pointer transition-all duration-500 ease-out-spring opacity-0 animate-fadeInUp ${
+                              isChecked 
+                                ? 'bg-gold-500/5 border-gold-500/20 opacity-50 scale-[0.98]' 
+                                : 'bg-midnight-950/40 border-gold-600/10 hover:border-gold-500/40 shadow-xl'
+                           }`}
+                           style={{ animationDelay: `${idx * 0.1}s` }}
+                         >
+                            <div className={`shrink-0 w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                               isChecked ? 'bg-gold-500 border-gold-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'border-gold-600/30 bg-midnight-900/50'
+                            }`}>
+                               {isChecked && (
+                                  <svg className="w-6 h-6 text-midnight-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                               )}
+                            </div>
+                            <div className="flex-1">
+                               <h4 className={`text-xl md:text-2xl font-serif font-bold transition-all duration-500 ${
+                                  isChecked ? 'line-through text-gold-600/60 italic' : 'text-gold-100'
+                               }`}>
+                                  {item.label}
+                               </h4>
+                               <p className={`text-sm mt-1 transition-colors duration-500 ${isChecked ? 'text-gold-800/40' : 'text-gold-600/70'}`}>
+                                  {item.desc}
+                               </p>
+                            </div>
+                         </div>
+                      );
+                   })}
+                </div>
+
+                <div className="mt-12 bg-gold-600/10 p-6 rounded-3xl border border-gold-600/20 text-center">
+                   <p className="text-gold-500 font-serif italic text-lg">
+                      "Barangsiapa yang tulus dalam ketaatannya, Allah akan berikan jalan keluar dari segala kesulitannya."
+                   </p>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'favorites' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {favorites.length === 0 ? (
                   <div className="col-span-full flex flex-col items-center justify-center py-24 text-slate-500">
                     <div className="text-8xl mb-6 text-gold-900 opacity-20">❤️</div>
                     <h3 className="text-2xl font-bold text-gold-600/50 uppercase tracking-[0.2em]">Belum Ada Mutiara Simpanan</h3>
-                    <p className="mt-2 text-slate-600 font-medium max-w-sm text-center">Simpan ayat atau hadist yang paling menyentuh kalbumu selama Ramadhan ini.</p>
+                    <p className="mt-2 text-slate-600 font-medium max-w-sm text-center">Simpan ayat atau hadist yang paling menyentuh kalbumu untuk dibaca kembali nanti.</p>
                   </div>
                 ) : (
                   favorites.map((item, index) => {

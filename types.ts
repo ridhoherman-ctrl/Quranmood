@@ -20,13 +20,13 @@ export interface QuranContent {
   ayahNumber: number;
   arabicText: string;
   translation: string;
-  reflection: string; // Singkat untuk konteks ayat
+  reflection: string;
 }
 
 export interface HadithContent {
   source: string;
   text: string;
-  reflection: string; // Singkat untuk konteks hadist
+  reflection: string;
 }
 
 export interface HealingContent {
@@ -34,9 +34,9 @@ export interface HealingContent {
   summary: string;
   quran: QuranContent;
   hadith: HadithContent;
-  wisdom: string; // Hikmah mendalam penggabungan keduanya
-  practicalSteps: string[]; // 3 langkah aksi nyata
-  reflectionQuestions: string[]; // 2 pertanyaan untuk user merenung
+  wisdom: string;
+  practicalSteps: string[];
+  reflectionQuestions: string[];
 }
 
 export interface FavoriteItem {
@@ -47,32 +47,38 @@ export interface FavoriteItem {
   moodContext: string;
 }
 
+export interface IbadahItem {
+  id: string;
+  label: string;
+  desc: string;
+}
+
 export interface MoodTheme {
-  background: string; // Global CSS gradient classes
-  primaryText: string; // Dark text for headers
-  secondaryText: string; // Muted text
-  accent: string; // Primary brand color for this mood (text color)
-  border: string; // Light border color for cards
+  background: string;
+  primaryText: string;
+  secondaryText: string;
+  accent: string;
+  border: string;
   ui: {
-    pill: string; // bg-color and text-color for small badges
-    buttonPrimary: string; // Main action button
-    buttonSecondary: string; // Outline/Ghost button
-    iconBg: string; // Background for icons
-    highlight: string; // For highlights/separators
+    pill: string;
+    buttonPrimary: string;
+    buttonSecondary: string;
+    iconBg: string;
+    highlight: string;
   }
 }
 
 export interface MoodConfig {
   type: MoodType;
   icon: string;
-  color: string; // Keeps the original selector button color logic
+  color: string;
   description: string;
-  theme: MoodTheme; // The new detailed theme definition
+  theme: MoodTheme;
 }
 
 export interface MoodLog {
   id: string;
   timestamp: number;
   mood: MoodType;
-  note?: string; // Optional user journal entry
+  note?: string;
 }

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { auth } from '../services/firebaseService';
 
@@ -17,7 +18,7 @@ const WaitingRoom: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          <h1 className="text-4xl font-serif font-bold text-gold-100">Menanti Restu Ilahi</h1>
+          <h1 className="text-4xl font-serif font-bold text-gold-100">Menanti Restu</h1>
           <div className="h-0.5 w-24 bg-gold-600/30 mx-auto"></div>
           <p className="text-lg text-slate-400 font-light leading-relaxed">
             "Sesuatu yang ditakdirkan untukmu tidak akan pernah menjadi milik orang lain."
@@ -26,10 +27,10 @@ const WaitingRoom: React.FC = () => {
 
         <div className="bg-midnight-900/60 backdrop-blur-md p-8 rounded-[2.5rem] border border-gold-600/20 shadow-2xl">
           <p className="text-gold-200 font-serif italic text-xl mb-4">
-            Terima kasih telah mendaftar, Sahabat.
+            Terima kasih telah bergabung, Sahabat.
           </p>
           <p className="text-slate-400 text-sm leading-relaxed mb-6">
-            Akun Anda saat ini sedang dalam proses tinjauan manual oleh admin kami untuk menjaga keharmonisan komunitas <strong>Qur'an Mood</strong>. Silakan periksa kembali secara berkala.
+            Akun Anda saat ini sedang dalam proses tinjauan manual oleh admin untuk menjaga kualitas komunitas <strong>Qur'an Mood</strong>. Silakan periksa kembali secara berkala.
           </p>
           <div className="flex flex-col gap-4">
             <button 

@@ -1,37 +1,34 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { HealingContent, MoodType } from "../types";
 
 export const generateHealingContent = async (mood: MoodType): Promise<HealingContent> => {
-  // Use process.env.API_KEY directly and use gemini-3-pro-preview for complex reasoning tasks
+  // Selalu inisialisasi instance baru untuk memastikan kunci terbaru digunakan (syarat Gemini API)
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
-  // Timestamp injection to ensure uniqueness
-  const uniqueSeed = Date.now();
-
-  // Optimized System Instruction: Define persona and general rules here
   const systemInstruction = `
-    Anda adalah sahabat bijaksana, psikolog Islami, dan ustadz yang menenangkan.
-    Gaya bicara: Hangat, empatik, menyentuh hati, namun ringkas dan padat (to-the-point).
-    Jangan bertele-tele. Fokus pada kualitas penyembuhan hati.
+    Anda adalah 'Qur'an Mood AI', pendamping spiritual yang bijaksana. 
+    Tugas Anda: Memberikan dukungan emosional melalui ayat Al-Quran dan Hadist.
+    Kepribadian: Sangat empati, menyejukkan, dan penuh kasih.
+    Bahasa: Indonesia yang puitis namun mudah dipahami.
+    Instruksi Khusus: Pilih Ayat dan Hadist yang SECARA LANGSUNG menjawab perasaan "${mood}".
   `;
 
-  // Optimized Prompt: Focus on specific data requirements only
   const prompt = `
-    Konteks: Pengguna sedang merasa "${mood}".
-    
-    TUGAS:
-    1. Pilih 1 Ayat Al-Quran (Random/Acak) yang relevan.
-    2. Pilih 1 Hadist pendukung.
-    3. Wisdom: Hikmah singkat (maksimal 2 kalimat) yang mengena.
-    4. Practical Steps: 3 langkah aksi nyata yang singkat.
-    5. Reflection Questions: 2 pertanyaan renungan pendek.
-    
-    Seed: ${uniqueSeed}
+    User saat ini merasa "${mood}".
+    Berikan respons dalam format JSON dengan struktur:
+    - mood: nama perasaan
+    - summary: satu kalimat sapaan hangat yang menenangkan
+    - quran: { surahName, surahNumber, ayahNumber, arabicText, translation, reflection }
+    - hadith: { source (misal: HR. Bukhari), text, reflection }
+    - wisdom: satu petuah bijak singkat
+    - practicalSteps: [3 langkah nyata untuk merasa lebih baik]
+    - reflectionQuestions: [2 pertanyaan renungan]
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: systemInstruction,
@@ -40,7 +37,7 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
           type: Type.OBJECT,
           properties: {
             mood: { type: Type.STRING },
-            summary: { type: Type.STRING, description: "Sapaan pembuka sangat singkat (1 kalimat)." },
+            summary: { type: Type.STRING },
             quran: {
               type: Type.OBJECT,
               properties: {
@@ -49,7 +46,7 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
                 ayahNumber: { type: Type.INTEGER },
                 arabicText: { type: Type.STRING },
                 translation: { type: Type.STRING },
-                reflection: { type: Type.STRING, description: "Konteks ayat (maks 15 kata)." },
+                reflection: { type: Type.STRING },
               },
               required: ["surahName", "surahNumber", "ayahNumber", "arabicText", "translation", "reflection"]
             },
@@ -58,63 +55,51 @@ export const generateHealingContent = async (mood: MoodType): Promise<HealingCon
               properties: {
                 source: { type: Type.STRING },
                 text: { type: Type.STRING },
-                reflection: { type: Type.STRING, description: "Konteks hadist (maks 15 kata)." },
+                reflection: { type: Type.STRING },
               },
               required: ["source", "text", "reflection"]
             },
-            wisdom: { type: Type.STRING, description: "Hikmah mendalam (maks 25 kata)." },
-            practicalSteps: { 
-              type: Type.ARRAY, 
-              items: { type: Type.STRING },
-              description: "3 langkah praktis singkat"
-            },
-            reflectionQuestions: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: "2 pertanyaan renungan singkat"
-            }
+            wisdom: { type: Type.STRING },
+            practicalSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
+            reflectionQuestions: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["mood", "summary", "quran", "hadith", "wisdom", "practicalSteps", "reflectionQuestions"]
         }
       }
     });
 
-    const text = response.text;
-    if (!text) {
-      throw new Error("No response from Gemini");
-    }
-
-    return JSON.parse(text.trim()) as HealingContent;
-
+    const resultText = response.text;
+    if (!resultText) throw new Error("AI returned empty content");
+    
+    return JSON.parse(resultText.trim());
   } catch (error) {
-    console.error("Error generating content:", error);
-    throw new Error("Maaf, kami mengalami kendala saat mencari penawar hatimu. Silakan coba lagi.");
+    console.error("Gemini API Error:", error);
+    throw new Error("Gagal mengambil cahaya petunjuk. Pastikan kunci API aktif.");
   }
 };
 
 export const generateSpeech = async (text: string): Promise<string> => {
-  // Use process.env.API_KEY directly and ensure model name is correct for TTS
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text }] }],
+      contents: [{ parts: [{ text: `Bacakan dengan nada tenang: ${text}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Puck' }, 
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, 
           },
         },
       },
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("No audio data returned");
+    if (!base64Audio) throw new Error("No audio returned");
     return base64Audio;
   } catch (error) {
-    console.error("Error generating speech:", error);
-    throw new Error("Gagal menghasilkan suara. Silakan coba lagi nanti.");
+    console.error("TTS Error:", error);
+    throw error;
   }
 };
